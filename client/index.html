@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible"="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .main-container {
+            display: flex;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        
+        .name h1 {
+            text-align: center;
+            font-size: 2rem;
+            color: #bb86fc;
+        }
+        
+        .top {
+            border-bottom: 2px solid #bb86fc;
+            padding: 10px;
+        }
+        
+        .left, .right {
+            width: 20%;
+            padding: 20px;
+            background-color: #1f1f1f;
+        }
+        
+        .center {
+            flex-grow: 1;
+            padding: 20px;
+            border-left: 2px solid #bb86fc;
+            border-right: 2px solid #bb86fc;
+            background-color: #1e1e1e;
+        }
+        
+        .container {
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-view {
+            flex-grow: 1;
+            overflow: auto;
+            background-color: #2c2c2c;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        .chat-input {
+            display: flex;
+            margin-top: 10px;
+            border-radius: 10px;
+        }
+        
+        .chat-input input {
+            flex-grow: 1;
+            background-color: #3c3c3c;
+            color: #ffffff;
+            border: 1px solid #bb86fc;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        
+        .chat-input button {
+            background-color: #bb86fc;
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        
+        .chat-input button:hover {
+            background-color: #9c5dff;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+        }
+        
+        .message p {
+            background-color: #3c3c3c;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        .status {
+            text-align: center;
+            background-color: #03dac6;
+            border-radius: 5px;
+            padding: 5px;
+            margin: 10px 0;
+            border: 2px solid #03dac6;
+        }
+        
+        .offline {
+            text-align: center;
+            background-color: #cf6679;
+            border-radius: 5px;
+            padding: 5px;
+            margin: 10px 0;
+            border: 2px solid #cf6679;
+        }
+        
+        .nickname {
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .nickname input {
+            border-radius: 4px;
+            padding: 5px;
+            border: 1px solid #bb86fc;
+            background-color: #3c3c3c;
+            color: #ffffff;
+        }
+        
+        .btnSave {
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .save-button {
+            width: 50%;
+            background-color: #03dac6;
+            border-radius: 4px;
+            padding: 10px;
+            color: #000000;
+            cursor: pointer;
+        }
+        
+        .save-button:hover {
+            background-color: #00bfae;
+        }
+        
+        .author {
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .bottom {
+            border-top: 2px solid #bb86fc;
+            padding: 10px;
+        }
+        
+        @media (max-width: 700px) {
+            .left, .right {
+                width: 25%;
+            }
+        
+            .chat-input input {
+                width: 60%;
+            }
+        
+            .message p {
+                font-size: 14px;
+            }
+        }
+
+        .user-item {
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .user-item:hover {
+            background-color: #3c3c3c;
+        }
+
+        .user-item.selected {
+            background-color: #bb86fc;
+        }
+    </style>
+    <title>Messenger</title>
+</head>
+<body>
+    <div class="main-container">
+        <div class="left">
+            <h1 style="text-align: center;">Contacts</h1>
+            <div id="userList" style="text-align: center;"></div>
+        </div>
+        <div class="center">
+            <div class="container">
+                <div class="chat-view">
+                    <div class="display" id="box"></div>
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="messageInput" placeholder="Your message">
+                    <button id="sendButton">Send</button>
+                </div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="nickname">
+                <input type="text" id="nicknameInput" placeholder="Your nickname" required size="10">
+            </div>
+            <div class="btnSave">
+                <button id="saveButton" class="save-button">Save</button>
+            </div>
+            <h4>Connection Status: <span id="status" class="offline">Offline</span></h4>
+        </div>
+    </div>
+
+    <script>
+        const webSocket = new WebSocket('ws://localhost:8080');
+
+        let nickname = '';
+        let selectedUser = '';
+        const messages = {}; // Store messages
+
+        const sendButton = document.getElementById('sendButton');
+        const messageInput = document.getElementById('messageInput');
+        const saveButton = document.getElementById('saveButton');
+        const nicknameInput = document.getElementById('nicknameInput');
+        const userListElement = document.getElementById('userList');
+        const statusElement = document.getElementById('status');
+
+        webSocket.onopen = () => {
+            statusElement.innerText = 'Online';
+            statusElement.className = 'status';
+        };
+
+        webSocket.onclose = () => {
+            statusElement.innerText = 'Offline';
+            statusElement.className = 'offline';
+        };
+
+        webSocket.onmessage = event => {
+            const message = JSON.parse(event.data);
+
+            if (message.type === 'user_list') {
+                updateUserList(message.users);
+            } else if (message.type === 'private_message') {
+                storeMessage(message);
+                if (message.from === selectedUser || message.to === selectedUser) {
+                    printMessage(message);
+                }
+            }
+        };
+
+        saveButton.addEventListener('click', registerUser);
+        nicknameInput.onkeydown = event => {
+            if (event.keyCode === 13) {
+                registerUser();
+            }
+        };
+
+        function registerUser() {
+            nickname = nicknameInput.value.trim();
+            if (nickname) {
+                webSocket.send(JSON.stringify({ type: 'register', nickname }));
+                nicknameInput.disabled = true;
+                saveButton.disabled = true;
+            }
+        }
+
+        function updateUserList(users) {
+            userListElement.innerHTML = '';
+            users.forEach(user => {
+                if (user !== nickname) {
+                    const userElement = document.createElement('div');
+                    userElement.innerText = user;
+                    userElement.className = 'user-item';
+                    userElement.addEventListener('click', () => selectUser(user, userElement));
+                    userListElement.appendChild(userElement);
+                }
+            });
+        }
+
+        function selectUser(user, userElement) {
+            selectedUser = user;
+            document.querySelectorAll('.user-item').forEach(item => item.classList.remove('selected'));
+            userElement.classList.add('selected');
+            displayMessages();
+        }
+
+        function storeMessage(message) {
+    const userKey = [message.from, message.to].sort().join(':');
+    if (!messages[userKey]) {
+        messages[userKey] = [];
+    }
+    messages[userKey].push(message);
+}
+
+
+function displayMessages() {
+    const display = document.getElementById('box');
+    const userKey = [nickname, selectedUser].sort().join(':');
+    if (messages[userKey]) {
+        messages[userKey].forEach(message => printMessage(message));
+    }
+}
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.onkeydown = event => {
+            if (event.keyCode === 13) {
+                sendMessage();
+            }
+        };
+
+        function sendMessage() {
+  const message = messageInput.value.trim();
+  if (message && selectedUser) {
+    const data = {
+      type: 'private_message',
+      from: nickname,
+      to: selectedUser,
+      message
+    };
+    const userKey = [nickname, selectedUser].sort().join(':');
+    messages[userKey] = []; // Clear previous messages for the user key
+    messages[userKey].push(data);
+    webSocket.send(JSON.stringify(data));
+    messageInput.value = '';
+    displayMessages();
+  }
+}
+
+
+        function printMessage({ id, from, message }) {
+    const display = document.getElementById('box');
+    const divMessage = document.createElement('div');
+    divMessage.className = 'message';
+    divMessage.innerHTML = `<p data-id="${id}">[${from}]: ${message}</p>`;
+    display.appendChild(divMessage);
+    display.scrollTop = display.scrollHeight;
+}
+
+    </script>
+</body>
+</html>
